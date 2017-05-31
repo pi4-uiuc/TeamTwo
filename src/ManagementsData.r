@@ -3,6 +3,10 @@ library(dplyr)
 library(RPostgreSQL)
 library(DBI)
 
+options(#betydb_key = readLines('~/.betykey', warn = FALSE),
+  betydb_url = "https://betydb.org",
+  betydb_api_version = 'beta')
+
 species <- betydb_query(table = 'species', limit = 'none') %>% 
   mutate(specie_id = id)
 
