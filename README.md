@@ -9,3 +9,4 @@ CONTRIBUTORS:
 GOALS:
  - Maximize utility function/yield of crop growth with respect to density
  - Examining height distribution of crops
+ - Maybe instead investigate the relationship between the planting chemistry and the yield.
