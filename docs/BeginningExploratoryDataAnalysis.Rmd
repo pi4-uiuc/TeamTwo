@@ -1,0 +1,47 @@
+---
+title: "Beginning Exploratory Data Analysis"
+author: "Will & Sam"
+date: "6/2/2017"
+output: html_document
+---
+
+We have data for planting density and corresponding yield. We may incorporate other dependent variables as necessary. 
+
+```{r}
+library(ggplot2)
+
+ggplot(data = , aes(x = planting density, y = yield, group = ))+
+  geom_smooth(se = FALSE, alpha=0.25, size = 0.5)+
+  geom_point(alpha = 0.25, size =0.5, position ='jitter')+
+  geom_boxplot(se = FALSE)+
+  
+#geom_smooth
+#geom_boxplot
+#geom_violin
+#geom_histogram
+#ggthemes:theme_tufte()
+  
+
+
+
+```
+
+```{r}
+#Some statistics. Will need to be updated as actual data becomes available. 
+traits_variables_season_2 %>%
+  group_by(date) %>%
+  summarize(mean = mean(mean), n = n())
+
+traits_variables_season_2 %>%
+  group_by(date, cultivar_id) %>%
+  summarize(mean = mean(mean), n = n())
+
+canopy_heights <- traits_variables_season_2 %>% 
+  group_by(date, cultivar_id) %>% 
+  summarize(mean = mean(mean), n =n()) 
+
+
+
+```
+
+Would also be interesting to compare data across and between different species. 
