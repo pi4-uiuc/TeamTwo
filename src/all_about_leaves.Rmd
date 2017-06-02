@@ -24,7 +24,7 @@ and a sufficiently large table of measurements of said variables:
 
 ```{r}
 
-leaf_traits <- betydb_query(table = "traits", limit = 3000) %>%
+leaf_traits <- betydb_query(table = "traits", limit = 10000) %>%
   inner_join(leaf_variables, by = "variable_id") %>%
   select(name, mean, units, description, date, specie_id, site_id, treatment_id)
 
@@ -47,11 +47,15 @@ species_ranking <- leaf_traits %>%
 
 ```
 
-Based on what traits and species we chose to query, it looks like Salix polaris is the most represented. Let's choose only the Salix polaris data, and then group by variable measured:
+Based on what traits and species we chose to query, it looks like Pinus radiata is among the most represented (some others like Salix polaris only have one variable with multiple measurements, which is a bit boring for exploratory data analysis). Let's choose only the Pinus radiata data, and then group by variable measured:
 
 ```{r}
 
-salpol_data <- leaf_traits %>%
-  filter(scientificname == "Salix polaris") %>%
+one_species_data <- leaf_traits %>%
+  filter(scientificname == "Pinus radiata") %>%
   group_by(name) %>%
   summarize(n = n())
+
+```
+
+We can also decide to group first by variable, and then explore the data as species varies.
