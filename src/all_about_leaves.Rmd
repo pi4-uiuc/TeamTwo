@@ -1,0 +1,57 @@
+---
+title: "All About Leaves"
+output: html_notebook
+---
+
+Let's load up the 67 leaf-related variables we're going to explore:
+
+```{r}
+library(traits)
+
+options(#betydb_key = readLines('~/.betykey', warn = FALSE),
+  betydb_url = "https://betydb.org",
+  betydb_api_version = 'beta')
+
+leaf_variables <- betydb_query(table = "variables", limit = 727) %>%
+  mutate(variable_id = id) %>%    # We're going to need to be joining based on variable_id later
+  select(variable_id, description, name, units) %>%    # Only care about the important stuff
+  filter(grepl("leaf",name)) %>%    # Only those variables with "leaf" in the name
+  collect()
+
+```
+
+and a sufficiently large table of measurements of said variables:
+
+```{r}
+
+leaf_traits <- betydb_query(table = "traits", limit = 3000) %>%
+  inner_join(leaf_variables, by = "variable_id") %>%
+  select(name, mean, units, description, date, specie_id, site_id, treatment_id)
+
+```
+
+So we have a bunch of data with varying species and varying parameters. Since we're going to be correlating parameters within a given species, first we're going to want to group by species. Let's find out which species are most represented in the data:
+
+```{r}
+
+species <- betydb_query(table = "species", limit = 10000) %>%    ## I believe there are 70529 distinct species total
+  mutate(specie_id = id)
+
+leaf_traits = leaf_traits %>%
+  left_join(species, by = "specie_id") %>%
+  select(name, mean, units, description, date, scientificname, commonname, site_id, treatment_id)
+
+species_ranking <- leaf_traits %>%
+  group_by(scientificname) %>%
+  summarize(n = n())
+
+```
+
+Based on what traits and species we chose to query, it looks like Salix polaris is the most represented. Let's choose only the Salix polaris data, and then group by variable measured:
+
+```{r}
+
+salpol_data <- leaf_traits %>%
+  filter(scientificname == "Salix polaris") %>%
+  group_by(name) %>%
+  summarize(n = n())
