@@ -7,12 +7,13 @@ Let's load up the 67 leaf-related variables we're going to explore:
 
 ```{r}
 library(traits)
+library(dplyr)
 
 options(#betydb_key = readLines('~/.betykey', warn = FALSE),
   betydb_url = "https://betydb.org",
   betydb_api_version = 'beta')
 
-leaf_variables <- betydb_query(table = "variables", limit = Inf) %>%
+leaf_variables <- betydb_query(table = "variables", limit = 'none') %>%    # Should take about 15 seconds
   mutate(variable_id = id) %>%    # We're going to need to be joining based on variable_id later
   select(variable_id, description, name, units) %>%    # Only care about the important stuff
   filter(grepl("leaf",name)) %>%    # Only those variables with "leaf" in the name
@@ -24,7 +25,7 @@ And a sufficiently large table of measurements of said variables:
 
 ```{r}
 
-leaf_traits <- betydb_query(table = "traits", limit = Inf) %>%    # Should take about 70 seconds
+leaf_traits_bare <- betydb_query(table = "traits", limit = 'none') %>%    # Should take about 70 seconds
   inner_join(leaf_variables, by = "variable_id") %>%
   select(name, mean, units, description, date, specie_id, site_id, treatment_id)
 
@@ -34,13 +35,14 @@ Let's hook leaf_traits up to the species table:
 
 ```{r}
 
-species <- betydb_query(table = "species", limit = Inf) %>%    ## I believe there are 70529 distinct species total; this takes around 10 minutes
+species <- betydb_query(table = "species", limit = 'none') %>%    ## I believe there are 70529 distinct species total; this takes around 10 minutes
   mutate(specie_id = id)
 
-leaf_traits = leaf_traits %>%
+leaf_traits <- leaf_traits_bare %>%
   left_join(species, by = "specie_id") %>%
   filter(!is.na(scientificname)) %>%    # For some reason there are a lot of specie_id values not found in the species table...
   select(name, mean, units, description, date, specie_id, scientificname, commonname, site_id, treatment_id)
+
 
 ```
 
@@ -62,9 +64,49 @@ species_ranking <- leaf_traits %>%
 
 ```
 
-It appears there are only 8 leaf variables that have been measured across 10+ species, and only 48 species have had 3+ unique leaf variables measured. Concerning ourselves only with these important species and variables, why not build a support vector machine that can predict which species a plant is, given one or more measurements of its leaves?
+It appears there are only 9 leaf variables that have been measured across 10+ species, and only 48 species have had 3+ unique leaf variables measured. Concerning ourselves only with these important species and variables, why not build a support vector machine that can predict which species a plant is, given one or more measurements of its leaves?
 
 ```{r}
+
+important_species <- species_ranking %>%
+  filter(traits_of_species >= 3) %>%
+  select(scientificname) %>%
+  collect()
+
+important_traits <- traits_ranking %>%
+  filter(species_with_trait >= 10) %>%
+  select(name) %>%
+  collect()
+
+important_species = as.vector(important_species$scientificname)
+important_traits = as.vector(important_traits$name)
+
+important_leaf_traits <- leaf_traits %>%
+  filter((name %in% important_traits) & (scientificname %in% important_species)) %>%
+  select(scientificname, name, mean) %>%
+  group_by(scientificname, name) %>%
+  mutate(supermean = mean(mean)) %>%
+  select(scientificname, name, supermean) %>%
+  unique
+
+final_table <- data.frame(matrix(ncol = 10, nrow = 48))
+
+colnames(final_table) <- c("Species",important_traits)
+
+final_table[,1] <- important_species
+
+for(rowIndex in 1:length(important_species)){
+    curSpecies <- important_species[rowIndex]
+  for(colIndex in 1:length(important_traits)){
+    curTrait <- important_traits[colIndex]
+    filtered = important_leaf_traits %>% filter((scientificname == curSpecies) & (name == curTrait))
+    if(nrow(filtered) == 1){
+      final_table[rowIndex,colIndex+1] = filtered[1,3]
+    }
+  }
+}
+
+
 
 # First we pare down our leaf_traits so that it only concerns important species and variables
 
