@@ -7,12 +7,13 @@ Let's load up the 67 leaf-related variables we're going to explore:
 
 ```{r}
 library(traits)
+library(dplyr)
 
 options(#betydb_key = readLines('~/.betykey', warn = FALSE),
   betydb_url = "https://betydb.org",
   betydb_api_version = 'beta')
 
-leaf_variables <- betydb_query(table = "variables", limit = 727) %>%
+leaf_variables <- betydb_query(table = "variables", limit = 'none') %>%    # Should take about 15 seconds
   mutate(variable_id = id) %>%    # We're going to need to be joining based on variable_id later
   select(variable_id, description, name, units) %>%    # Only care about the important stuff
   filter(grepl("leaf",name)) %>%    # Only those variables with "leaf" in the name
@@ -20,42 +21,99 @@ leaf_variables <- betydb_query(table = "variables", limit = 727) %>%
 
 ```
 
-and a sufficiently large table of measurements of said variables:
+And a sufficiently large table of measurements of said variables:
 
 ```{r}
 
-leaf_traits <- betydb_query(table = "traits", limit = 10000) %>%
+leaf_traits_bare <- betydb_query(table = "traits", limit = 'none') %>%    # Should take about 70 seconds
   inner_join(leaf_variables, by = "variable_id") %>%
   select(name, mean, units, description, date, specie_id, site_id, treatment_id)
 
 ```
 
-So we have a bunch of data with varying species and varying parameters. Since we're going to be correlating parameters within a given species, first we're going to want to group by species. Let's find out which species are most represented in the data:
+Let's hook leaf_traits up to the species table:
 
 ```{r}
 
-species <- betydb_query(table = "species", limit = 10000) %>%    ## I believe there are 70529 distinct species total
+species <- betydb_query(table = "species", limit = 'none') %>%    ## I believe there are 70529 distinct species total; this takes around 10 minutes
   mutate(specie_id = id)
 
-leaf_traits = leaf_traits %>%
+leaf_traits <- leaf_traits_bare %>%
   left_join(species, by = "specie_id") %>%
-  select(name, mean, units, description, date, scientificname, commonname, site_id, treatment_id)
+  filter(!is.na(scientificname)) %>%    # For some reason there are a lot of specie_id values not found in the species table...
+  select(name, mean, units, description, date, specie_id, scientificname, commonname, site_id, treatment_id)
+
+
+```
+
+Now we're cooking with gas. Some of the species and variables are rather obscure, though (in fact only 21 of the 67 leaf-related variables are populated at all, by my count), so let's see which species have had the most unique variables measured, and which variables have been measured across the widest range of species:
+
+```{r}
+
+traits_ranking <- leaf_traits %>%
+  group_by(name) %>%
+  mutate(species_with_trait = length(unique(scientificname))) %>%
+  select(name, species_with_trait) %>%
+  unique
 
 species_ranking <- leaf_traits %>%
   group_by(scientificname) %>%
-  summarize(n = n())
+  mutate(traits_of_species = length(unique(name))) %>%
+  select(scientificname, commonname, traits_of_species) %>%
+  unique
 
 ```
 
-Based on what traits and species we chose to query, it looks like Pinus radiata is among the most represented (some others like Salix polaris only have one variable with multiple measurements, which is a bit boring for exploratory data analysis). Let's choose only the Pinus radiata data, and then group by variable measured:
+It appears there are only 9 leaf variables that have been measured across 10+ species, and only 48 species have had 3+ unique leaf variables measured. Concerning ourselves only with these important species and variables, why not build a support vector machine that can predict which species a plant is, given one or more measurements of its leaves?
 
 ```{r}
 
-one_species_data <- leaf_traits %>%
-  filter(scientificname == "Pinus radiata") %>%
-  group_by(name) %>%
-  summarize(n = n())
+important_species <- species_ranking %>%
+  filter(traits_of_species >= 3) %>%
+  select(scientificname) %>%
+  collect()
+
+important_traits <- traits_ranking %>%
+  filter(species_with_trait >= 10) %>%
+  select(name) %>%
+  collect()
+
+important_species = as.vector(important_species$scientificname)
+important_traits = as.vector(important_traits$name)
+
+important_leaf_traits <- leaf_traits %>%
+  filter((name %in% important_traits) & (scientificname %in% important_species)) %>%
+  select(scientificname, name, mean) %>%
+  group_by(scientificname, name) %>%
+  mutate(supermean = mean(mean)) %>%
+  select(scientificname, name, supermean) %>%
+  unique
+
+final_table <- data.frame(matrix(ncol = 10, nrow = 48))
+
+colnames(final_table) <- c("Species",important_traits)
+
+final_table[,1] <- important_species
+
+for(rowIndex in 1:length(important_species)){
+    curSpecies <- important_species[rowIndex]
+  for(colIndex in 1:length(important_traits)){
+    curTrait <- important_traits[colIndex]
+    filtered = important_leaf_traits %>% filter((scientificname == curSpecies) & (name == curTrait))
+    if(nrow(filtered) == 1){
+      final_table[rowIndex,colIndex+1] = filtered[1,3]
+    }
+  }
+}
+
+
+
+# First we pare down our leaf_traits so that it only concerns important species and variables
+
+# Then we read these measurements and produce a table with 8 columns (leaf variables) and 48 rows (species), taking the mean (median?) where a specific variable has been measured on a specific species multiple times
+
+# Then we fill in NA entries with gross column means (this will both allow the SVM to work, but also possibly bias the SVM to favoritize classifications of species with many NA values relative to the measurements inputted; if this becomes an issue, we could mitigate it via a "master predictor" which, given m < 8 leaf measurements, builds an SVM from only those m columns and applies it to the input)
+
+# Then we build an SVM that will classify based on these rows. Since there are only as many "observations" as classes, this should be equivalent to 1-nearest-neighbor prediction.
 
 ```
-
-We can also decide to group first by variable, and then explore the data as species varies.
