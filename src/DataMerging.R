@@ -22,10 +22,8 @@ yieldVersusDensity <- left_join(yields,left_join(planting,mt,by='management_id')
 saveRDS(yieldVersusDensity, file='data/yieldVersusDensity.rds')
 
 #Join species,sites data to certain subfields of yields
-<<<<<<< HEAD
-=======
+
 #(This can be uncommented if species or sites data needs to be joined)
->>>>>>> master
 #yieldsSpecSites <- select(yields, id, date, mean, n, statname, stat, site_id, specie_id, treatment_id, citation_id, cultivar_id) %>% 
 #  left_join(species, by = 'specie_id') %>%
 #  left_join(sites, by = 'site_id')
