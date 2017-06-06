@@ -8,6 +8,8 @@ options(#betydb_key = readLines('~/.betykey', warn = FALSE),
   betydb_url = "https://betydb.org",
   betydb_api_version = 'beta')
 
+setwd('~/TeamTwo')
+
 #Gather species data:
 if (!file.exists('data/species.rds')) {
   species <- betydb_query(table = 'species', limit = 'none')
