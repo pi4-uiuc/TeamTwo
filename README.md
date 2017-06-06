@@ -15,4 +15,4 @@ Secondary goals:
  - Maybe instead investigate the relationship between the planting chemistry and the yield.
 
 Data needed:
- - Crop yeild and planting density
+ - Crop yield and planting density
