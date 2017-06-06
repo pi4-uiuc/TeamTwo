@@ -80,7 +80,8 @@ important_traits <- traits_ranking %>%
 
 important_species = as.vector(important_species$scientificname)
 important_traits = as.vector(important_traits$name)
-
+print(important_species)
+print(important_traits)
 important_leaf_traits <- leaf_traits %>%
   filter((name %in% important_traits) & (scientificname %in% important_species)) %>%
   select(scientificname, name, mean) %>%
@@ -89,22 +90,30 @@ important_leaf_traits <- leaf_traits %>%
   select(scientificname, name, supermean) %>%
   unique
 
-final_table <- data.frame(matrix(ncol = 10, nrow = 48))
+#The below code accomplishes what the for loop is intended to accomplish.
 
-colnames(final_table) <- c("Species",important_traits)
+install.packages('reshape2')
+library(reshape2)
+organized_important_leaf_traits <- dcast(important_leaf_traits, scientificname ~ name, value.var="supermean")
 
-final_table[,1] <- important_species
+ 
 
-for(rowIndex in 1:length(important_species)){
-    curSpecies <- important_species[rowIndex]
-  for(colIndex in 1:length(important_traits)){
-    curTrait <- important_traits[colIndex]
-    filtered = important_leaf_traits %>% filter((scientificname == curSpecies) & (name == curTrait))
-    if(nrow(filtered) == 1){
-      final_table[rowIndex,colIndex+1] = filtered[1,3]
-    }
-  }
-}
+#final_table <- data.frame(matrix(ncol = length(important_traits)+1, nrow = length(important_species)))
+
+#colnames(final_table) <- c("Species",important_traits)
+
+#final_table[,1]<-important_species
+
+#for(rowIndex in 1:length(important_species)){
+    #curSpecies <- important_species[rowIndex]
+  #for(colIndex in 1:length(important_traits)){
+    #curTrait <- important_traits[colIndex]
+    #filtered = important_leaf_traits %>% filter((scientificname == curSpecies) & (name == curTrait))
+    #if(nrow(filtered) == 1){
+      #final_table[rowIndex,colIndex+1] = filtered[1,3]
+    #}
+  #}
+#}
 
 
 
