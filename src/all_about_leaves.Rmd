@@ -80,7 +80,8 @@ important_traits <- traits_ranking %>%
 
 important_species = as.vector(important_species$scientificname)
 important_traits = as.vector(important_traits$name)
-
+print(important_species)
+print(important_traits)
 important_leaf_traits <- leaf_traits %>%
   filter((name %in% important_traits) & (scientificname %in% important_species)) %>%
   select(scientificname, name, mean) %>%
