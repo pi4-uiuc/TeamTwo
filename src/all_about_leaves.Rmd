@@ -8,6 +8,7 @@ Let's load up the 67 leaf-related variables we're going to explore:
 ```{r}
 library(traits)
 library(dplyr)
+library(reshape2)
 
 options(#betydb_key = readLines('~/.betykey', warn = FALSE),
   betydb_url = "https://betydb.org",
@@ -88,35 +89,23 @@ important_leaf_traits <- leaf_traits %>%
   select(scientificname, name, supermean) %>%
   unique
 
-final_table <- data.frame(matrix(ncol = length(important_traits) + 1, nrow = length(important_species)))
+organized_important_leaf_traits <- dcast(important_leaf_traits, scientificname ~ name, value.var="supermean")
 
-colnames(final_table) <- c("Species",important_traits)
-
-final_table[,1] <- important_species
-
-for(rowIndex in 1:length(important_species)){
-    curSpecies <- important_species[rowIndex]
-  for(colIndex in 1:length(important_traits)){
-    curTrait <- important_traits[colIndex]
-    filtered = important_leaf_traits %>% filter((scientificname == curSpecies) & (name == curTrait))
-    if(nrow(filtered) == 1){
-      final_table[rowIndex,colIndex+1] = filtered[1,3]
-    }
-  }
-}
-
-predict_species <- function(c2n_leaf = NA, leafN = NA, leaf_biomass_area = NA, leafP = NA, leaf_respiration_rate_m2 = NA, leaf_longevity = NA, leafC = NA, leaf_biomass_plant = NA, leaf_turnover_rate = NA) {
-  prediction_key = c(c2n_leaf, leafN, leaf_biomass_area, leafP, leaf_respiration_rate_m2, leaf_longevity, leafC, leaf_biomass_plant, leaf_turnover_rate)
-  n = nrow(final_table)
+predict_species <- function(c2n_leaf = NA, leaf_biomass_area = NA, leafN = NA, leafP = NA, leaf_respiration_rate_m2 = NA, leaf_longevity = NA, leafC = NA, leaf_biomass_plant = NA, leaf_turnover_rate = NA) {
+  prediction_key = c(c2n_leaf, leaf_biomass_area, leaf_biomass_plant, leaf_longevity, leaf_respiration_rate_m2, leaf_turnover_rate, leafC, leafN, leafP)
+  n = nrow(organized_important_leaf_traits)
+  m = ncol(organized_important_leaf_traits)
   distance_column = data.frame(matrix(ncol = 1, nrow = n))
-  colnames(distance_column) = "Difference"
-  for(i in 1:nrow(final_table)){
-    distance_column[i,1] = species_distance(final_table[i,2:10], prediction_key)
+  for(i in 1:nrow(organized_important_leaf_traits)){
+    distance_column[i,1] = species_distance(organized_important_leaf_traits[i,2:m], prediction_key)
   }
-  results_table = final_table %>%
-    select(Species) %>%
+  results_table = organized_important_leaf_traits %>%
     cbind(distance_column)
-  return(results_table)
+  results_table = results_table[,c(1,m+1)]
+  colnames(results_table) <- c("Species","Difference")
+  print(nrow(results_table))
+  print(length(results_table$Difference))
+  return(arrange(results_table, results_table[,2])[1:3,])
 }
 
 
