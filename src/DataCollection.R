@@ -1,8 +1,8 @@
+# Loads data from betydb.org if possible; if not possible,
+# loads data from CSV file in data/ directory.
+
 library(traits)
-library(dplyr)
 library(readr)
-library(DBI)
-library(RPostgreSQL)
 
 options(#betydb_key = readLines('~/.betykey', warn = FALSE),
   betydb_url = "https://betydb.org",
@@ -10,56 +10,51 @@ options(#betydb_key = readLines('~/.betykey', warn = FALSE),
 
 setwd('~/TeamTwo')
 
-#Gather species data:
-if (!file.exists('data/species.rds')) {
-  species <- betydb_query(table = 'species', limit = 'none')
-  names(species)[names(species)=='id'] <- 'specie_id'
-  saveRDS(species, 'data/species.rds')
-} else {
-  species <- readRDS('data/species.rds')
+betydbQuerySlick <- function(tableName,idName) {
+  # Given tableName, returns data from <tableName> at betydb.org,
+  # and both loads data into environment and saves file to RDS.
+  # If RDS already exists, loads from RDS instead of querying
+  # database. Renames key column 'id' with idName.
+  if (!file.exists(paste0('data/',tableName,'.rds'))) {
+    tableData <- betydb_query(table = tableName, limit = 'none')
+    names(tableData)[names(tableData)=='id'] <- idName
+    saveRDS(tableData, paste0('data/',tableName,'.rds'))
+  } else {
+    tableData <- readRDS(paste0('data/',tableName,'.rds'))
+  }
+  return(tableData)
 }
+
+csvLoadSlick <- function(tableName) {
+  # Given tableName, loads <tableName>.csv from data/, loads
+  # into memory, and saves to RDS. If RDS already exists, loads
+  # from RDS instead of loading from CSV. Sets all column names
+  # to lower case.
+  if (!file.exists(paste0('data/',tableName,'.rds'))) {
+    tableData <- read_csv(paste0('data/',tableName,'.csv'))
+    colnames(tableData) <- tolower(colnames(tableData))
+    saveRDS(tableData,paste0('data/',tableName,'.rds'))
+  } else {
+    tableData <- readRDS(paste0('data/',tableName,'.rds'))
+  }
+  return(tableData)
+}
+
+#Gather species data:
+species <- betydbQuerySlick(tableName = 'species', idName = 'specie_id')
 
 #Gather sites data:
-if (!file.exists('data/sites.rds')) {
-  sites <- betydb_query(table = 'sites', limit = 'none')
-  names(sites)[names(sites)=='id'] <- 'sites_id'
-  saveRDS(sites,'data/sites.rds')
-} else {
-  sites <- readRDS('data/sites.rds')
-}
+sites <- betydbQuerySlick(tableName = 'sites', idName = 'sites_id')
 
 #Gather traits data:
-if (!file.exists('data/traits.rds')) {
-  traits <- betydb_query(table = 'traits', limit = 'none')
-  names(traits)[names(traits)=='id'] <- 'traits_id'
-  saveRDS(traits,'data/traits.rds')
-} else {
-  traits <- readRDS('data/traits.rds')
-}
+traits <- betydbQuerySlick(tableName = 'traits', idName = 'traits_id')
 
 #Gather variables data:
-if (!file.exists('data/variables.rds')) {
-  variables <- betydb_query(table = 'variables', limit = 'none')
-  names(variables)[names(variables)=='id'] <- 'variables_id'
-  saveRDS(variables,'data/variables.rds')
-} else {
-  variables <- readRDS('data/variables.rds')
-}
+variables <- betydbQuerySlick(tableName = 'variables', idName = 'variables_id')
 
 #Gather yields data:
-if (!file.exists('data/yields.rds')) {
-  yields <- betydb_query(table = 'yields', limit = 'none')
-  names(yields)[names(yields)=='id'] <- 'yields_id'
-  saveRDS(yields, file='data/yields.rds')
-} else {
-  yields <- readRDS('data/yields.rds')
-}
+yields <- betydbQuerySlick(tableName = 'yields', idName = 'yields_id')
 
-#Load managements and managements_treatments from csv
-#(Data not available through betydb_query() command)
-m <- read_csv('data/managements.csv')
-colnames(m) <- tolower(colnames(m))
-if (!file.exists('data/managements.rds')) {saveRDS(m,'data/managements.rds')}
-mt <- read_csv('data/managements_treatments.csv')
-colnames(mt) <- tolower(colnames(mt))
-if (!file.exists('data/managements_treatments.rds')) {saveRDS(mt,'data/managements_treatments.rds')}
+#Load managements and managements_treatments from CSV
+m <- csvLoadSlick('managements')
+mt <- csvLoadSlick('managements_treatments')
