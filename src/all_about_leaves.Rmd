@@ -130,7 +130,58 @@ species_distance <- function(species_data, data_point) {
   }
 }
 
-results <- predict_species(leaf_biomass_area = 1000, leafP = 0.1, leaf_turnover_rate = 0.4)
+results <- predict_species(leaf_biomass_plant = 4.3, leaf_respiration_rate_m2 =   1.18)
+
+
+
+
+```
+
+```{r}
+traits_ranking <- leaf_traits %>%
+  group_by(name) %>%
+  mutate(species_with_trait = length(unique(scientificname))) %>%
+  select(name, species_with_trait) %>%
+  unique
+
+species_ranking <- leaf_traits %>%
+  group_by(scientificname) %>%
+  mutate(traits_of_species = length(unique(name))) %>%
+  select(scientificname, commonname, traits_of_species) %>%
+  unique
+
+
+important_species <- species_ranking %>%
+  filter(traits_of_species >= 3) %>%
+  select(scientificname) %>%
+  collect()
+
+important_traits <- traits_ranking %>%
+  filter(species_with_trait >= 10) %>%
+  select(name) %>%
+  collect()
+
+important_species = as.vector(important_species$scientificname)
+important_traits = as.vector(important_traits$name)
+print(important_species)
+print(important_traits)
+important_leaf_traits <- leaf_traits %>%
+  filter((name %in% important_traits) & (scientificname %in% important_species)) %>%
+  select(scientificname, name, mean) %>%
+  group_by(scientificname, name) %>%
+  mutate(supermean = mean(mean)) %>%
+  select(scientificname, name, supermean) %>%
+  unique
+
+organized_important_leaf_traits <- dcast(important_leaf_traits, scientificname ~ name, value.var="supermean")
+
+
+
+
+```
+
+```{r}
+resprateN <- subset(leaf_traits, name == 'leafN' | name == 'leaf_respiration_rate_m2')
 
 
 ```
