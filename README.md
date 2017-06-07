@@ -7,12 +7,8 @@ CONTRIBUTORS:
  - Sam Wester
 
 Primary goals:
- - Investigate relationship between planting density (plants / m^2) and crop yield.
-
-Secondary goals:
- - Maximize utility function/yield of crop growth with respect to density.
- - Examining height distribution of crops.
- - Maybe instead investigate the relationship between the planting chemistry and the yield.
+ - Build a support vector machine which will, given traits of a leaf (Carbon-to-Nitrogen ration, leaf biomass area, etc), guess the species of the leaf. 
 
 Data needed:
- - Crop yeild and planting density
+ - leaf traits, species data
+ - Since many traits entries are empty, we need to consider only those species that have enough data available to assign a meaningful value for each variable.
