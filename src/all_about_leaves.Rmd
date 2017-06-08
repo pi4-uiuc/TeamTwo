@@ -8,6 +8,7 @@ Let's load up the 67 leaf-related variables we're going to explore:
 ```{r}
 library(traits)
 library(dplyr)
+library(reshape2)
 
 leaf_variables <- select(readRDS('data/variables.rds'), variable_id, description, name, units) %>%    # Only care about the important stuff
   filter(grepl("leaf",name)) %>%    # Only those variables with "leaf" in the name
@@ -35,7 +36,6 @@ leaf_traits <- leaf_traits_bare %>%
   left_join(species, by = "specie_id") %>%
   filter(!is.na(scientificname)) %>%    # For some reason there are a lot of specie_id values not found in the species table...
   select(name, mean, units, description, date, specie_id, scientificname, commonname, site_id, treatment_id)
-
 
 ```
 
@@ -83,39 +83,98 @@ important_leaf_traits <- leaf_traits %>%
   select(scientificname, name, supermean) %>%
   unique
 
-#The below code accomplishes what the for loop is intended to accomplish.
-
-install.packages('reshape2')
-library(reshape2)
 organized_important_leaf_traits <- dcast(important_leaf_traits, scientificname ~ name, value.var="supermean")
 
- 
-
-#final_table <- data.frame(matrix(ncol = length(important_traits)+1, nrow = length(important_species)))
-
-#colnames(final_table) <- c("Species",important_traits)
-
-#final_table[,1]<-important_species
-
-#for(rowIndex in 1:length(important_species)){
-    #curSpecies <- important_species[rowIndex]
-  #for(colIndex in 1:length(important_traits)){
-    #curTrait <- important_traits[colIndex]
-    #filtered = important_leaf_traits %>% filter((scientificname == curSpecies) & (name == curTrait))
-    #if(nrow(filtered) == 1){
-      #final_table[rowIndex,colIndex+1] = filtered[1,3]
-    #}
-  #}
-#}
+predict_species <- function(c2n_leaf = NA, leaf_biomass_area = NA, leafN = NA, leafP = NA, leaf_respiration_rate_m2 = NA, leaf_longevity = NA, leafC = NA, leaf_biomass_plant = NA, leaf_turnover_rate = NA) {
+  prediction_key = c(c2n_leaf, leaf_biomass_area, leaf_biomass_plant, leaf_longevity, leaf_respiration_rate_m2, leaf_turnover_rate, leafC, leafN, leafP)
+  n = nrow(organized_important_leaf_traits)
+  m = ncol(organized_important_leaf_traits)
+  distance_column = data.frame(matrix(ncol = 1, nrow = n))
+  for(i in 1:nrow(organized_important_leaf_traits)){
+    distance_column[i,1] = species_distance(organized_important_leaf_traits[i,2:m], prediction_key)
+  }
+  results_table = organized_important_leaf_traits %>%
+    cbind(distance_column)
+  results_table = results_table[,c(1,m+1)]
+  colnames(results_table) <- c("Species","Difference")
+  print(nrow(results_table))
+  print(length(results_table$Difference))
+  return(arrange(results_table, results_table[,2])[1:3,])
+}
 
 
+species_distance <- function(species_data, data_point) {
+  incomparables = 0
+  n = length(species_data)
+  sum_distance = 0
+  for(i in 1:length(species_data)){
+    if(!is.na(species_data[i]) & !is.na(data_point[i])){
+      sum_distance = sum_distance + ((species_data[i]-data_point[i])/data_point[i])^2 + ((species_data[i]-data_point[i])/species_data[i])^2
+    }
+    else {
+      incomparables = incomparables + 1
+    }
+  }
+  if(incomparables == n){
+    return(NA)
+  }
+  else {
+    return(sum_distance / (n - incomparables))
+  }
+}
 
-# First we pare down our leaf_traits so that it only concerns important species and variables
+results <- predict_species(leaf_biomass_plant = 4.3, leaf_respiration_rate_m2 =   1.18)
 
-# Then we read these measurements and produce a table with 8 columns (leaf variables) and 48 rows (species), taking the mean (median?) where a specific variable has been measured on a specific species multiple times
 
-# Then we fill in NA entries with gross column means (this will both allow the SVM to work, but also possibly bias the SVM to favoritize classifications of species with many NA values relative to the measurements inputted; if this becomes an issue, we could mitigate it via a "master predictor" which, given m < 8 leaf measurements, builds an SVM from only those m columns and applies it to the input)
 
-# Then we build an SVM that will classify based on these rows. Since there are only as many "observations" as classes, this should be equivalent to 1-nearest-neighbor prediction.
+
+```
+
+```{r}
+traits_ranking <- leaf_traits %>%
+  group_by(name) %>%
+  mutate(species_with_trait = length(unique(scientificname))) %>%
+  select(name, species_with_trait) %>%
+  unique
+
+species_ranking <- leaf_traits %>%
+  group_by(scientificname) %>%
+  mutate(traits_of_species = length(unique(name))) %>%
+  select(scientificname, commonname, traits_of_species) %>%
+  unique
+
+
+important_species <- species_ranking %>%
+  filter(traits_of_species >= 3) %>%
+  select(scientificname) %>%
+  collect()
+
+important_traits <- traits_ranking %>%
+  filter(species_with_trait >= 10) %>%
+  select(name) %>%
+  collect()
+
+important_species = as.vector(important_species$scientificname)
+important_traits = as.vector(important_traits$name)
+print(important_species)
+print(important_traits)
+important_leaf_traits <- leaf_traits %>%
+  filter((name %in% important_traits) & (scientificname %in% important_species)) %>%
+  select(scientificname, name, mean) %>%
+  group_by(scientificname, name) %>%
+  mutate(supermean = mean(mean)) %>%
+  select(scientificname, name, supermean) %>%
+  unique
+
+organized_important_leaf_traits <- dcast(important_leaf_traits, scientificname ~ name, value.var="supermean")
+
+
+
+
+```
+
+```{r}
+resprateN <- subset(leaf_traits, name == 'leafN' | name == 'leaf_respiration_rate_m2')
+
 
 ```
