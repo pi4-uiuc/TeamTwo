@@ -6,7 +6,7 @@ output: html_notebook
 Let's load up the 67 leaf-related variables we're going to explore:
 
 ```{r}
-library(traits)
+library(readr)
 library(dplyr)
 library(reshape2)
 
@@ -14,7 +14,7 @@ options(#betydb_key = readLines('~/.betykey', warn = FALSE),
   betydb_url = "https://betydb.org",
   betydb_api_version = 'beta')
 
-leaf_variables <- loadRDS("data/variables.rds") %>%
+leaf_variables <- readRDS("~/TeamTwo/data/variables.rds") %>%
   select(variable_id, description, name, units) %>%    # Only care about the important stuff
   filter(grepl("leaf",name)) %>%    # Only those variables with "leaf" in the name
   collect()
@@ -25,7 +25,7 @@ And a sufficiently large table of measurements of said variables:
 
 ```{r}
 
-leaf_traits_bare <- loadRDS('data/traits.rds') %>%
+leaf_traits_bare <- readRDS('~/TeamTwo/data/traits.rds') %>%
   inner_join(leaf_variables, by = "variable_id") %>%
   select(name, mean, units, description, date, specie_id, site_id, treatment_id)
 
@@ -38,7 +38,7 @@ Let's hook leaf_traits up to the species table:
 # species <- betydb_query(table = "species", limit = 'none') %>%    ## I believe there are 70529 distinct species total; this takes around 10 minutes
 #  mutate(specie_id = id)
 
-species <- readRDS('data/species.rds')
+species <- readRDS('~/TeamTwo/data/species.rds')
 
 leaf_traits <- leaf_traits_bare %>%
   left_join(species, by = "specie_id") %>%
