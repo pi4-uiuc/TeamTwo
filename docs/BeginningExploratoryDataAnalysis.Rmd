@@ -5,12 +5,12 @@ date: "6/2/2017"
 output: html_document
 ---
 
-We have data for planting density and corresponding yield. We may incorporate other dependent variables as necessary. 
+We have been gathering data for planting density and corresponding yield. We may incorporate other dependent variables as necessary. 
 
 ```{r}
 library(ggplot2)
-
-ggplot(data = , aes(x = planting density, y = yield, group = ))+
+#Setting up code for future data plots
+ggplot(data = , aes(x = planting_density, y = yield, group = ))+
   geom_smooth(se = FALSE, alpha=0.25, size = 0.5)+
   geom_point(alpha = 0.25, size =0.5, position ='jitter')+
   geom_boxplot(se = FALSE)+
@@ -25,6 +25,8 @@ ggplot(data = , aes(x = planting density, y = yield, group = ))+
 
 
 ```
+
+For beginning analysis, after cleaning, we wanted to look at a histogram of the different planting densities available and also consider scatterplots and boxplots of the yields corresponding to the different planting densities. 
 
 ```{r}
 #Some statistics. Will need to be updated as actual data becomes available. 
@@ -48,4 +50,8 @@ Would also be interesting to compare data across and between different species.
 
 ##Update 6/1/2017
 
-We performed some beginning data analysis on '/data/yieldVersusDensity.rds' We observed that there are very few distinct planting densities for each different plant species. In fact, removing all NAs there are only 6 in the above table, and if we look at the larger yields database, there are 37 unique plant species, but only 33 unique planting densities. We are concerned that this is not enough data to obtain meaningful (since our question essentially reduces to "does species play a role in determining yield?", which seems almost tautological). 
+We performed some beginning data analysis on '/data/yieldVersusDensity.rds', which was obtained after running the scripts 'src/DataCollection.r' and 'src/DataMerging.r'. 
+
+We observed that there are very few distinct planting densities for each different plant species. In fact, removing all NAs there are only 6 in the yieldVersusDensity plot, and if we look at the larger 'data/yields.rds' and'data/species.rds' tables, there are 37 unique plant species, but only 33 unique planting densities. 
+
+We are concerned that this is not enough data to obtain meaningful conclusions, since it seems from the above data that each plant species has a recommended planting density. This would mean that our measurements would essentially reduce to measuring yield based on plant species, which is not very interesting and is in some sense ill-defined. 
