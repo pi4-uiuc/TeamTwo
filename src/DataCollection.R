@@ -41,10 +41,10 @@ csvLoadSlick <- function(tableName) {
 }
 
 #Gather species data:
-species <- betydbQuerySlick(tableName = 'species', idName = 'specie_id')
+# species <- betydbQuerySlick(tableName = 'species', idName = 'specie_id')
 
 #Gather sites data:
-sites <- betydbQuerySlick(tableName = 'sites', idName = 'site_id')
+# sites <- betydbQuerySlick(tableName = 'sites', idName = 'site_id')
 
 #Gather traits data:
 traits <- betydbQuerySlick(tableName = 'traits', idName = 'traits_id')
@@ -56,5 +56,5 @@ variables <- betydbQuerySlick(tableName = 'variables', idName = 'variable_id')
 yields <- betydbQuerySlick(tableName = 'yields', idName = 'yields_id')
 
 #Load managements and managements_treatments from CSV
-m <- csvLoadSlick('managements')
-mt <- csvLoadSlick('managements_treatments')
+# m <- csvLoadSlick('managements')
+# mt <- csvLoadSlick('managements_treatments')
