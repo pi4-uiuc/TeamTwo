@@ -5,9 +5,8 @@ output:
   html_notebook: default
 ---
 
-Let's load up the 67 leaf-related variables we're going to explore:
-
 ```{r}
+
 library(readr)
 library(dplyr)
 library(reshape2)
@@ -55,15 +54,15 @@ traits_ranking <- leaf_traits %>%
   select(name, species_with_trait) %>%
   unique
 
-important_traits <- traits_ranking %>%
+important_variables <- traits_ranking %>%
   filter(species_with_trait >= 20) %>%
   select(name) %>%
   collect()
 
-important_traits = as.vector(important_traits$name)
+important_variables = as.vector(important_variables$name)
 
 important_leaf_traits <- leaf_traits %>%
-  filter(name %in% important_traits) %>%
+  filter(name %in% important_variables) %>%
   select(scientificname, name, mean)
 
 species_ranking <- important_leaf_traits %>%
@@ -73,7 +72,7 @@ species_ranking <- important_leaf_traits %>%
   unique
 
 important_species <- species_ranking %>%
-  filter(traits_of_species >= 8) %>%
+  filter(traits_of_species >= 4) %>%
   select(scientificname) %>%
   collect()
 
@@ -120,15 +119,15 @@ The predictor defined below uses the above distance function to predict the spec
 
 ```{r}
 
-organized_important_leaf_traits <- dcast(important_leaf_traits_training, scientificname ~ name, value.var="supermean")
+mean_analysis <- dcast(important_leaf_traits_training, scientificname ~ name, value.var="supermean")
 std_analysis <- dcast(important_leaf_traits_training, scientificname ~ name, value.var="std")
 
-important_traits = tail(colnames(organized_important_leaf_traits), -1)
+important_variables = tail(colnames(mean_analysis), -1)
 
-for(i in 1:nrow(organized_important_leaf_traits)){
-  for(j in 2:ncol(organized_important_leaf_traits)){
+for(i in 1:nrow(mean_analysis)){
+  for(j in 2:ncol(mean_analysis)){
     if(is.na(std_analysis[i,j])){
-      organized_important_leaf_traits[i,j] = NA
+      mean_analysis[i,j] = NA
     }
   }
 }
@@ -159,15 +158,15 @@ predict_species <- function(c2n_leaf = NA, leaf_biomass_area = NA, leaf_biomass_
     prediction_key = c(c2n_leaf, leaf_biomass_area, leaf_biomass_plant, leaf_longevity, leaf_respiration_rate_m2, leaf_turnover_rate, leafC, leafN, leafP)
   }
 
-  n = nrow(organized_important_leaf_traits)
-  m = ncol(organized_important_leaf_traits)
+  n = nrow(mean_analysis)
+  m = ncol(mean_analysis)
   distance_column = data.frame(matrix(ncol = 1, nrow = n))
-  for(i in 1:nrow(organized_important_leaf_traits)){
+  for(i in 1:nrow(mean_analysis)){
 
-    distance_column[i,1] = species_distance(organized_important_leaf_traits[i,2:m], std_analysis[i,2:m], prediction_key)
+    distance_column[i,1] = species_distance(mean_analysis[i,2:m], std_analysis[i,2:m], prediction_key)
 
   }
-  results_table = organized_important_leaf_traits %>%
+  results_table = mean_analysis %>%
     cbind(distance_column)
   results_table = results_table[,c(1,m+1)]
   colnames(results_table) <- c("Species","Difference")
@@ -208,13 +207,41 @@ test_predictor <- function(species, traitsN) {
     return(NA)
   }
   else {
-    print(take_from[1:3,])
-
-    return(predict_species(prediction_key = to_key(take_from[1:traitsN,], important_traits)))
+    # print(take_from[1:traitsN,])
+    return(predict_species(prediction_key = to_key(take_from[1:traitsN,], important_variables)))
   }
 }
 
-test_predictor("Liquidambar styraciflua",3)
+analyze_performance <- function(traitsN) {
+  analyzable_species = important_leaf_traits_testing %>%
+    group_by(scientificname) %>%
+    mutate(avail_traits = length(unique(name))) %>%
+    filter(avail_traits >= traitsN) %>%
+    select(scientificname)
+  
+  analyzable_species = unique(as.vector(analyzable_species$scientificname))
+  endDF = data.frame(matrix(nrow = length(analyzable_species), ncol = 2))
+  
+  for(i in 1:length(analyzable_species)){
+    endDF[i,1] = analyzable_species[i]
+    endDF[i,2] = which(test_predictor(analyzable_species[i], traitsN)$Species == analyzable_species[i])
+  }
+  
+  colnames(endDF) = c("Species","Prediction place")
+  return(endDF)
+}
+
+analyze_performance(3)
+
+# Example of how wildly some entries are distributed. The first column represents three random traits taken from Acer rubrum; the second and third columns represent the mean and standard deviation, respectively, of the traits for Acer rubrum as analyzed in the training data.
+
+#           Sample    Acer rubrum (mean)    Acer rubrum (stdv)
+#   SLA      16.6          16.0                  4.28              ~0.14σ off
+# c2n_leaf   23.1          43.2                  20.1              ~1.00σ off
+# leaf_resp  3.53          0.40                  0.14              ~22.4σ off !!!
+
+# Can you blame the predictor for not thinking the sample belonged to Acer rubrum, with such a crazy leaf_resp value?
+# Problems with a predictor of this sort seem unavoidable with sparse, highly variable data like this. 
 
 
 ```

@@ -41,7 +41,7 @@ csvLoadSlick <- function(tableName) {
 }
 
 #Gather species data:
-# species <- betydbQuerySlick(tableName = 'species', idName = 'specie_id')
+species <- betydbQuerySlick(tableName = 'species', idName = 'specie_id')
 
 #Gather sites data:
 # sites <- betydbQuerySlick(tableName = 'sites', idName = 'site_id')
