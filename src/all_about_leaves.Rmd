@@ -16,7 +16,6 @@ options(#betydb_key = readLines('~/.betykey', warn = FALSE),
 
 leaf_variables <- readRDS("~/TeamTwo/data/variables.rds") %>%
   select(variable_id, description, name, units) %>%    # Only care about the important stuff
-  filter(grepl("leaf",name)) %>%    # Only those variables with "leaf" in the name
   collect()
 
 ```
@@ -56,39 +55,38 @@ traits_ranking <- leaf_traits %>%
   select(name, species_with_trait) %>%
   unique
 
-species_ranking <- leaf_traits %>%
+important_traits <- traits_ranking %>%
+  filter(species_with_trait >= 20) %>%
+  select(name) %>%
+  collect()
+
+important_traits = as.vector(important_traits$name)
+
+important_leaf_traits <- leaf_traits %>%
+  filter(name %in% important_traits) %>%
+  select(scientificname, name, mean)
+
+species_ranking <- important_leaf_traits %>%
   group_by(scientificname) %>%
   mutate(traits_of_species = length(unique(name))) %>%
-  select(scientificname, commonname, traits_of_species) %>%
+  select(scientificname, traits_of_species) %>%
   unique
-  
-```
-
-It appears there are only 9 leaf variables that have been measured across 10+ species, and only 53 species have had 3+ unique leaf variables measured. Concerning ourselves only with these important species and variables, why not build a program that can predict which species a plant is, given one or more measurements of its leaves?
-
-```{r}
 
 important_species <- species_ranking %>%
   filter(traits_of_species >= 3) %>%
   select(scientificname) %>%
   collect()
 
-important_traits <- traits_ranking %>%
-  filter(species_with_trait >= 10) %>%
-  select(name) %>%
-  collect()
-
 important_species = as.vector(important_species$scientificname)
-important_traits = as.vector(important_traits$name)
 
-
-important_leaf_traits <- leaf_traits %>%
-  filter((name %in% important_traits) & (scientificname %in% important_species)) %>%
-  select(scientificname, name, mean)
+important_leaf_traits = important_leaf_traits %>%
+  filter(scientificname %in% important_species)
   
 ```
 
-Now we will split our data into training data (90%) and testing data (10%) after randomizing it by row.
+It appears there are only 9 leaf variables that have been measured across 10+ species, and only 53 species have had 3+ unique leaf variables measured. Concerning ourselves only with these important species and variables, why not build a program that can predict which species a plant is, given one or more measurements of its leaves?
+
+We will split our data into training data (90%) and testing data (10%) after randomizing it by row.
 
 ```{r}
 
@@ -97,11 +95,13 @@ important_leaf_traits = important_leaf_traits[sample(nrow(important_leaf_traits)
 training = round(nrow(important_leaf_traits)*0.9)
 testing = nrow(important_leaf_traits) - training
 
+
 important_leaf_traits_training <- important_leaf_traits %>%
   head(training) %>%
   group_by(scientificname, name) %>%
   mutate(supermean = mean(mean)) %>%
-  select(scientificname, name, supermean) %>%
+  mutate(std = sd(mean)) %>%
+  select(scientificname, name, supermean, std) %>%
   unique
 
 important_leaf_traits_testing <- important_leaf_traits %>%
@@ -109,24 +109,35 @@ important_leaf_traits_testing <- important_leaf_traits %>%
 
 ```
 
-
 ```{r}
 
 organized_important_leaf_traits <- dcast(important_leaf_traits_training, scientificname ~ name, value.var="supermean")
+std_analysis <- dcast(important_leaf_traits_training, scientificname ~ name, value.var="std")
 
-species_distance <- function(species_data, data_point) {
+important_traits = tail(colnames(organized_important_leaf_traits), -1)
+
+for(i in 1:nrow(organized_important_leaf_traits)){
+  for(j in 2:ncol(organized_important_leaf_traits)){
+    if(is.na(std_analysis[i,j])){
+      organized_important_leaf_traits[i,j] = NA
+    }
+  }
+}
+
+species_distance <- function(species_data, species_std, data_point) {
+
   incomparables = 0
   n = length(species_data)
   sum_distance = 0
   for(i in 1:length(species_data)){
     if(!is.na(species_data[i]) & !is.na(data_point[i])){
-      sum_distance = sum_distance + ((species_data[i]-data_point[i])/data_point[i])^2 + ((species_data[i]-data_point[i])/species_data[i])^2
+      sum_distance = sum_distance + ((species_data[i]-data_point[i])/species_std[i])^2
     }
     else {
       incomparables = incomparables + 1
     }
   }
-  if(incomparables == n){
+  if(incomparables >= n-1){
     return(NA)
   }
   else {
@@ -134,19 +145,25 @@ species_distance <- function(species_data, data_point) {
   }
 }
 
-predict_species <- function(c2n_leaf = NA, leaf_biomass_area = NA, leaf_biomass_plant = NA, leaf_longevity = NA, leaf_respiration_rate_m2 = NA, leaf_turnover_rate = NA, leafC = NA, leafN = NA, leafP = NA) {
-  prediction_key = c(c2n_leaf, leaf_biomass_area, leaf_biomass_plant, leaf_longevity, leaf_respiration_rate_m2, leaf_turnover_rate, leafC, leafN, leafP)
+predict_species <- function(c2n_leaf = NA, leaf_biomass_area = NA, leaf_biomass_plant = NA, leaf_longevity = NA, leaf_respiration_rate_m2 = NA, leaf_turnover_rate = NA, leafC = NA, leafN = NA, leafP = NA, prediction_key = NA) {
+  if(missing(prediction_key)){
+    prediction_key = c(c2n_leaf, leaf_biomass_area, leaf_biomass_plant, leaf_longevity, leaf_respiration_rate_m2, leaf_turnover_rate, leafC, leafN, leafP)
+  }
+
   n = nrow(organized_important_leaf_traits)
   m = ncol(organized_important_leaf_traits)
   distance_column = data.frame(matrix(ncol = 1, nrow = n))
   for(i in 1:nrow(organized_important_leaf_traits)){
-    distance_column[i,1] = species_distance(organized_important_leaf_traits[i,2:m], prediction_key)
+
+    distance_column[i,1] = species_distance(organized_important_leaf_traits[i,2:m], std_analysis[i,2:m], prediction_key)
+
   }
   results_table = organized_important_leaf_traits %>%
     cbind(distance_column)
   results_table = results_table[,c(1,m+1)]
   colnames(results_table) <- c("Species","Difference")
-  return(arrange(results_table, results_table[,2])[1:3,])
+
+  return(arrange(results_table, results_table[,2]))
 }
 
 ```
@@ -155,16 +172,24 @@ Now that we have our predictor, we can see how well it does on the testing data.
 
 ```{r}
 
+to_key <- function(df, cols) {
+  m = length(cols)
+  n = nrow(df)
+  endDF = data.frame(matrix(nrow = 1, ncol = m))
+  colnames(endDF) = cols
+  for(col in cols){
+    endDF[1,col] = NA
+    for(i in 1:n){
+      if(df[i,1] == col){
+        endDF[1,col] = df[i,2]
+      }
+    }
+  }
+  return(endDF)
+}
+
 test_predictor <- function(species, traitsN) {
-  c2n_leaf <- NA
-  leaf_biomass_area = NA
-  leaf_biomass_plant = NA
-  leaf_longevity = NA
-  leaf_respiration_rate_m2 = NA
-  leaf_turnover_rate = NA
-  leafC = NA
-  leafN = NA
-  leafP = NA
+
   take_from = important_leaf_traits_testing %>%
     filter(scientificname == species) %>%
     select(name, mean)
@@ -175,58 +200,12 @@ test_predictor <- function(species, traitsN) {
   }
   else {
     print(take_from[1:3,])
-    variables = variableHelper(take_from, traitsN)
-    c2n_leaf = variables[1]
-    leaf_biomass_area = variables[2]
-    leaf_biomass_plant = variables[3]
-    leaf_longevity = variables[4]
-    leaf_respiration_rate_m2 = variables[5]
-    leaf_turnover_rate = variables[6]
-    leafC = variables[7]
-    leafN = variables[8]
-    leafP = variables[9]
-    return(predict_species(c2n_leaf, leaf_biomass_area, leaf_biomass_plant, leaf_longevity, leaf_respiration_rate_m2, leaf_turnover_rate, leafC, leafN, leafP))
+
+    return(predict_species(prediction_key = to_key(take_from[1:traitsN,], important_traits)))
   }
 }
 
-variableHelper <- function(take_from, traitsN, c2n_leaf = NA, leaf_biomass_area = NA, leaf_biomass_plant = NA, leaf_longevity = NA, leaf_respiration_rate_m2 = NA, leaf_turnover_rate = NA, leafC = NA, leafN = NA, leafP = NA) {
-  if(traitsN == 0) {
-    return(c(c2n_leaf, leaf_biomass_area, leaf_biomass_plant, leaf_longevity, leaf_respiration_rate_m2, leaf_turnover_rate, leafC, leafN, leafP))
-  }
-  else {
-    firstVariable = take_from[1,"name"]
-    value = take_from[1,"mean"]
-    if(firstVariable == "c2n_leaf") {
-      c2n_leaf = value
-    }
-    else if(firstVariable == "leaf_biomass_area") {
-      leaf_biomass_area = value
-    }
-    else if(firstVariable == "leaf_biomass_plant") {
-      leaf_biomass_plant = value
-    }
-    else if(firstVariable == "leaf_longevity") {
-      leaf_longevity = value
-    }
-    else if(firstVariable == "leaf_respiration_rate_m2") {
-      leaf_respiration_rate_m2 = value
-    }
-    else if(firstVariable == "leaf_turnover_rate") {
-      leaf_turnover_rate = value
-    }
-    else if(firstVariable == "leafC") {
-      leafC = value
-    }
-    else if(firstVariable == "leafN") {
-      leafN = value
-    }
-    else if(firstVariable == "leafP") {
-      leafP = value
-    }
-    return(variableHelper(take_from[-1,], traitsN - 1, c2n_leaf, leaf_biomass_area, leaf_biomass_plant, leaf_longevity, leaf_respiration_rate_m2, leaf_turnover_rate, leafC, leafN, leafP))
-  }
-}
+test_predictor("Betula alleghaniensis",3)
 
-test_predictor("Acer saccharum", 3)
 
 ```
