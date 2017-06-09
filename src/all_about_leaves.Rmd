@@ -1,6 +1,8 @@
 ---
 title: "All About Leaves"
-output: html_notebook
+output:
+  html_document: default
+  html_notebook: default
 ---
 
 Let's load up the 67 leaf-related variables we're going to explore:
@@ -34,10 +36,8 @@ Let's hook leaf_traits up to the species table:
 
 ```{r}
 
-# species <- betydb_query(table = "species", limit = 'none') %>%    ## I believe there are 70529 distinct species total; this takes around 10 minutes
-#  mutate(specie_id = id)
-
-species <- readRDS('~/TeamTwo/data/species.rds')
+species <- read.csv('~/TeamTwo/data/species.csv') %>%
+  mutate(specie_id = id)
 
 leaf_traits <- leaf_traits_bare %>%
   left_join(species, by = "specie_id") %>%
@@ -45,7 +45,7 @@ leaf_traits <- leaf_traits_bare %>%
 
 ```
 
-Now we're cooking with gas. Some of the species and variables are rather obscure, though (in fact only 21 of the 67 leaf-related variables are populated at all, by my count), so let's see which species have had the most unique variables measured, and which variables have been measured across the widest range of species:
+Now we're cooking with gas. Some of the species and variables are rather obscure, though, so let's see which species have had the most unique variables measured, and which variables have been measured across the widest range of species:
 
 ```{r}
 
@@ -73,7 +73,7 @@ species_ranking <- important_leaf_traits %>%
   unique
 
 important_species <- species_ranking %>%
-  filter(traits_of_species >= 3) %>%
+  filter(traits_of_species >= 8) %>%
   select(scientificname) %>%
   collect()
 
@@ -84,7 +84,9 @@ important_leaf_traits = important_leaf_traits %>%
   
 ```
 
-It appears there are only 9 leaf variables that have been measured across 10+ species, and only 53 species have had 3+ unique leaf variables measured. Concerning ourselves only with these important species and variables, why not build a program that can predict which species a plant is, given one or more measurements of its leaves?
+It appears there are only 14 leaf variables that have been measured across 20+ species, and only 17 species have had 8+ unique leaf variables measured. Concerning ourselves only with these important species and variables, why not build a program that can predict which species a plant is, given one or more measurements of its leaves?
+
+Given a particular species, the data collected in the leaf_traits file gives a mean measurement for a particular trait recorded at some particular site and time. We find the mean of these mean measurements (we call this the supermean), and assign this value as the trait measurement for the species.
 
 We will split our data into training data (90%) and testing data (10%) after randomizing it by row.
 
@@ -108,6 +110,13 @@ important_leaf_traits_testing <- important_leaf_traits %>%
   tail(testing)
 
 ```
+
+We use the following distance function to measure how close a user-provided input of trait data corresponds to the known data from the species table: if $s=(s_1, \ldots, s_n)$ is species data and $p=(p_1, \ldots, p_n)$ is measurement data, where $n$ is the number of traits compared, then \[d(s,p)=\frac{1}{n}\sum_{i=1}^{n}\left(\frac{s_i-p_i}{\sigma_i^s}\right)^2,\]
+
+
+where $\sigma_i^s$ is the standard deviation of the $i^{\mathrm{th}}$ variables for the species $s$. We will only compare traits for which the species data and the measument data are both not NA. The goal is to find a species $s$ which minimizes this function.
+
+The predictor defined below uses the above distance function to predict the species which corresponds best to a given set of plant traits data. It returns its top three guesses, ordered by minimizing the distance function $d$.
 
 ```{r}
 
@@ -168,7 +177,7 @@ predict_species <- function(c2n_leaf = NA, leaf_biomass_area = NA, leaf_biomass_
 
 ```
 
-Now that we have our predictor, we can see how well it does on the testing data. We'll do this by first constructing a function which takes a species name and an integer n, and returns how accurate the predictor's guess was given n random leaf measurements from that species (as taken from the testing data).
+Now that we have our predictor, we can see how well it does on the testing data. We'll do this by first constructing a function which takes a species name and an integer $n$, and returns how accurate the predictor's guess was given $n$ random leaf measurements from that species (as taken from the testing data).
 
 ```{r}
 
@@ -205,7 +214,7 @@ test_predictor <- function(species, traitsN) {
   }
 }
 
-test_predictor("Betula alleghaniensis",3)
+test_predictor("Liquidambar styraciflua",3)
 
 
 ```
